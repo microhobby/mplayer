@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 
+set -e
+
 # install the necessary dependencies
 sudo apt-get update
 sudo apt-get install -y \
-    build-essential musl-tools yasm zlib1g-dev libpng-dev
-
-
-export CC=musl-gcc
-
+    linux-libc-dev \
+    build-essential \
+    yasm zlib1g-dev \
+    libpng-dev
 
 ./configure --enable-static --yasm='' \
   --disable-x11 --disable-alsa --disable-arts \
@@ -15,8 +16,7 @@ export CC=musl-gcc
   --disable-directfb --disable-aa --disable-caca \
   --disable-lirc --disable-tv --disable-radio \
   --disable-dvdread --disable-dvdnav --disable-mencoder \
-  --disable-live --disable-libavformat \
-  --enable-fbdev
+  --disable-live --enable-fbdev
 
 
 make -j$(nproc)
