@@ -10,7 +10,14 @@ sudo apt-get install -y \
     yasm zlib1g-dev \
     libpng-dev
 
+_ARCH=$(arch)
+
+if [ "$_ARCH" = "x86_64" ]; then
+    export CFLAGS="-march=x86-64 -mtune=generic"
+fi
+
 ./configure --enable-static --yasm='' \
+  --disable-runtime-cpudetection \
   --disable-x11 --disable-alsa --disable-arts \
   --disable-sdl --disable-vidix --disable-mga --disable-gl \
   --disable-directfb --disable-aa --disable-caca \
