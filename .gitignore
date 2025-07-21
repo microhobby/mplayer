@@ -1,0 +1,82 @@
+# Compiled object files
+*.o
+*.d
+*.obj
+*.lo
+*.la
+*.lai
+
+# Static libraries
+*.a
+*.lib
+
+# Shared objects (dynamic libraries)
+*.so
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.out
+*.elf
+*.app
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Build directories
+/build/
+/bin/
+/obj/
+/out/
+/_.*
+
+# Dependency directories
+.deps/
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Coverage files
+*.gcda
+*.gcno
+*.lcov
+
+# Profiling
+*.prof
+*.profdata
+
+# Logs and report files
+*.log
+*.report
+
+# IDE and editor directories/files
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-workspace
+*.sublime-project
+*.iml
+
+# Vim swap files
+*.swp
+*.swo
+*.swn
+
+# Emacs backup files
+*~
+\#*\#
+
+# Tags
+tags
+TAGS
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+*.version

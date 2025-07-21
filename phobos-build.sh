@@ -13,17 +13,27 @@ sudo apt-get install -y \
 _ARCH=$(arch)
 
 if [ "$_ARCH" = "x86_64" ]; then
-    export CFLAGS="-march=x86-64 -mtune=generic"
-fi
+  # x86-64 need to be generic for old machines
+  export CFLAGS="-march=generic64 -mtune=generic64"
 
-./configure --enable-static --yasm='' \
-  --disable-runtime-cpudetection \
-  --disable-x11 --disable-alsa --disable-arts \
-  --disable-sdl --disable-vidix --disable-mga --disable-gl \
-  --disable-directfb --disable-aa --disable-caca \
-  --disable-lirc --disable-tv --disable-radio \
-  --disable-dvdread --disable-dvdnav --disable-mencoder \
-  --disable-live --enable-fbdev
+  ./configure --enable-static --yasm='' \
+    --disable-runtime-cpudetection \
+    --disable-x11 --disable-alsa --disable-arts \
+    --disable-sdl --disable-vidix --disable-mga --disable-gl \
+    --disable-directfb --disable-aa --disable-caca \
+    --disable-lirc --disable-tv --disable-radio \
+    --disable-dvdread --disable-dvdnav --disable-mencoder \
+    --disable-live --enable-fbdev
+else
+  # normal compile
+  ./configure --enable-static --yasm='' \
+    --disable-x11 --disable-alsa --disable-arts \
+    --disable-sdl --disable-vidix --disable-mga --disable-gl \
+    --disable-directfb --disable-aa --disable-caca \
+    --disable-lirc --disable-tv --disable-radio \
+    --disable-dvdread --disable-dvdnav --disable-mencoder \
+    --disable-live --enable-fbdev
+fi
 
 
 make -j$(nproc)
