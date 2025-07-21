@@ -14,7 +14,7 @@ _ARCH=$(arch)
 
 if [ "$_ARCH" = "x86_64" ]; then
   # x86-64 need to be generic for old machines
-  export CFLAGS="-march=generic64 -mtune=generic64"
+  export CFLAGS="-O2 -march=x86-64 -mtune=generic -mno-sse4.1 -mno-sse4.2 -mno-avx -mno-avx2 -mno-fma -mno-f16c"
 
   ./configure --enable-static --yasm='' \
     --disable-runtime-cpudetection \
