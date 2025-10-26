@@ -33,6 +33,7 @@
 #include "config.h"
 #include "video_out.h"
 #define NO_DRAW_FRAME
+#define USE_CONVERT2FB
 #include "video_out_internal.h"
 #include "fastmemcpy.h"
 #include "sub/sub.h"
@@ -105,6 +106,8 @@ static int fb_cmap_changed = 0; //  to restore map
 static int fb_pixel_size;	// 32:  4  24:  3  16:  2  15:  2
 static size_t fb_size; // size of frame_buffer
 static int fb_line_len; // length of one line in bytes
+static int fb_page = 0; // current page for double buffering
+static int fb_yres; // store yres for page calculations
 static void (*draw_alpha_p)(int w, int h, unsigned char *src,
 		unsigned char *srca, int stride, unsigned char *dst,
 		int dstride);
@@ -185,6 +188,12 @@ static int fb_preinit(int reset)
 	}
 	// random ioctl to check if we seem to run on OMAPFB
 #define OMAPFB_SYNC_GFX (('O' << 8) | 37)
+#ifndef FBIO_WAITFORVSYNC
+#define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
+#endif
+#ifndef FBIOPAN_DISPLAY
+#define FBIOPAN_DISPLAY 0x4606
+#endif
 	fb_omap = ioctl(fb_dev_fd, OMAPFB_SYNC_GFX) == 0;
 	fb_orig_vinfo = fb_vinfo;
 
@@ -220,6 +229,7 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
 
 	in_width = width;
 	in_height = height;
+	fb_yres = fb_vinfo.yres;
 
 	if (fb_vinfo.xres < in_width || fb_vinfo.yres < in_height) {
 		mp_msg(MSGT_VO, MSGL_ERR, "[fbdev2] Screensize is smaller than video size (%dx%d < %dx%d)\n",
@@ -269,6 +279,15 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
 
 		fb_size = fb_finfo.smem_len;
 		fb_line_len = fb_finfo.line_length;
+
+		// Check for double buffering capability
+		if (fb_vinfo.yres_virtual >= 2 * fb_vinfo.yres) {
+			mp_msg(MSGT_VO, MSGL_V, "[fbdev2] Double buffering available (virtual height: %d, physical: %d)\n",
+			       fb_vinfo.yres_virtual, fb_vinfo.yres);
+		} else {
+			mp_msg(MSGT_VO, MSGL_V, "[fbdev2] Double buffering not available\n");
+		}
+
 		if ((frame_buffer = (uint8_t *) mmap(0, fb_size, PROT_READ | PROT_WRITE, MAP_SHARED, fb_dev_fd, 0)) == (uint8_t *) -1) {
 			mp_msg(MSGT_VO, MSGL_ERR, "[fbdev2] Can't mmap %s: %s\n", fb_dev_name, strerror(errno));
 			return 1;
@@ -394,12 +413,58 @@ static void check_events(void)
 
 static void flip_page(void)
 {
-#ifndef USE_CONVERT2FB
+#ifdef USE_CONVERT2FB
+	// Direct framebuffer mode - just sync and refresh
+
+	// Wait for VSync if available (reduces tearing)
+	if (fb_dev_fd >= 0) {
+		int dummy = 0;
+		// FBIO_WAITFORVSYNC - wait for vertical sync
+		ioctl(fb_dev_fd, FBIO_WAITFORVSYNC, &dummy);
+	}
+
+	// Force hardware refresh for OMAP devices
+	if (fb_omap) {
+		ioctl(fb_dev_fd, OMAPFB_SYNC_GFX);
+	}
+#else
 	int out_offset = 0, in_offset = 0;
 
-	memcpy_pic(center + out_offset, next_frame + in_offset,
-	           in_width * fb_pixel_size, in_height,
-	           fb_line_len, in_width * fb_pixel_size);
+	// Wait for VSync if available (reduces tearing)
+	if (fb_dev_fd >= 0) {
+		int dummy = 0;
+		// FBIO_WAITFORVSYNC - wait for vertical sync
+		ioctl(fb_dev_fd, FBIO_WAITFORVSYNC, &dummy);
+	}
+
+	// Check if we can use hardware page flipping for double buffering
+	if (vo_doublebuffering && fb_vinfo.yres_virtual >= 2 * fb_yres) {
+		// Use hardware page flipping
+		int next_page = !fb_page;
+		int page_delta = next_page - fb_page;
+
+		fb_vinfo.yoffset = fb_page * fb_yres;
+		if (ioctl(fb_dev_fd, FBIOPAN_DISPLAY, &fb_vinfo) == 0) {
+			// Page flip successful, update center pointer
+			center += page_delta * fb_yres * fb_line_len;
+			fb_page = next_page;
+		} else {
+			// Fallback to memory copy
+			memcpy_pic(center + out_offset, next_frame + in_offset,
+			           in_width * fb_pixel_size, in_height,
+			           fb_line_len, in_width * fb_pixel_size);
+		}
+	} else {
+		// Use memory copy method
+		memcpy_pic(center + out_offset, next_frame + in_offset,
+		           in_width * fb_pixel_size, in_height,
+		           fb_line_len, in_width * fb_pixel_size);
+	}
+
+	// Force hardware refresh for OMAP devices
+	if (fb_omap) {
+		ioctl(fb_dev_fd, OMAPFB_SYNC_GFX);
+	}
 #endif
 }
 
@@ -412,6 +477,8 @@ static void uninit(void)
 	}
 	free(next_frame);
 	if (fb_dev_fd >= 0) {
+		// Reset page offset to original state
+		fb_orig_vinfo.yoffset = 0;
 		if (ioctl(fb_dev_fd, FBIOPUT_VSCREENINFO, &fb_orig_vinfo))
 			mp_msg(MSGT_VO, MSGL_ERR, "[fbdev2] Can't reset original fb_var_screeninfo: %s\n", strerror(errno));
 		close(fb_dev_fd);
@@ -419,6 +486,7 @@ static void uninit(void)
 	}
 	if(frame_buffer) munmap(frame_buffer, fb_size);
 	next_frame = frame_buffer = NULL;
+	fb_page = 0; // reset page for next session
 	fb_preinit(1); // so that later calls to preinit don't fail
 }
 
