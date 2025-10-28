@@ -118,6 +118,7 @@ extern const vo_functions_t video_out_zr;
 extern const vo_functions_t video_out_zr2;
 extern const vo_functions_t video_out_bl;
 extern const vo_functions_t video_out_fbdev2;
+extern const vo_functions_t video_out_drm;
 extern const vo_functions_t video_out_png;
 extern const vo_functions_t video_out_ggi;
 extern const vo_functions_t video_out_aa;
@@ -230,6 +231,9 @@ const vo_functions_t* const video_out_drivers[] =
 #ifdef CONFIG_FBDEV
         &video_out_fbdev,
         &video_out_fbdev2,
+#endif
+#ifdef CONFIG_DRM
+        &video_out_drm,
 #endif
 #ifdef CONFIG_SVGALIB
         &video_out_svga,

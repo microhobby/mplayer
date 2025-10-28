@@ -6,9 +6,13 @@ set -e
 sudo apt-get update
 sudo apt-get install -y \
     linux-libc-dev \
+    linux-headers-generic \
     build-essential \
     yasm zlib1g-dev \
-    libpng-dev
+    libpng-dev \
+    libdrm-dev \
+    libswscale-dev \
+    pkg-config
 
 _ARCH=$(arch)
 
@@ -23,7 +27,7 @@ if [ "$_ARCH" = "x86_64" ]; then
     --disable-directfb --disable-aa --disable-caca \
     --disable-lirc --disable-tv --disable-radio \
     --disable-dvdread --disable-dvdnav --disable-mencoder \
-    --disable-live --enable-fbdev
+    --disable-live --enable-fbdev --enable-drm --disable-ass
 else
   # normal compile
   ./configure --enable-static --yasm='' \
@@ -32,7 +36,7 @@ else
     --disable-directfb --disable-aa --disable-caca \
     --disable-lirc --disable-tv --disable-radio \
     --disable-dvdread --disable-dvdnav --disable-mencoder \
-    --disable-live --enable-fbdev
+    --disable-live --enable-fbdev --enable-drm --disable-ass
 fi
 
 

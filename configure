@@ -507,6 +507,7 @@ Video output:
   --enable-xshape          enable XShape support [autodetect]
   --disable-xss            disable screensaver support via xss [autodetect]
   --enable-fbdev           enable FBDev video output [autodetect]
+  --enable-drm             enable DRM/KMS video output [autodetect]
   --enable-mlib            enable mediaLib video output (Solaris) [disable]
   --enable-3dfx            enable obsolete /dev/3dfx video output [disable]
   --enable-tdfxfb          enable tdfxfb video output [disable]
@@ -723,6 +724,7 @@ _caca=auto
 _svga=auto
 _vesa=auto
 _fbdev=auto
+_drm=auto
 _dvb=auto
 _dxr2=auto
 _dxr3=auto
@@ -1102,6 +1104,8 @@ for ac_option do
   --disable-vesa)       _vesa=no        ;;
   --enable-fbdev)       _fbdev=yes      ;;
   --disable-fbdev)      _fbdev=no       ;;
+  --enable-drm)         _drm=yes        ;;
+  --disable-drm)        _drm=no         ;;
   --enable-dvb)         _dvb=yes        ;;
   --disable-dvb)        _dvb=no         ;;
   --enable-dxr2)        _dxr2=yes       ;;
@@ -5420,6 +5424,24 @@ fi
 echores "$_fbdev"
 
 
+echocheck "DRM/KMS"
+if test "$_drm" = auto ; then
+  _drm=no
+  if linux ; then
+    header_check "xf86drm.h" && header_check "xf86drmMode.h" && _drm=yes
+  fi
+fi
+if test "$_drm" = yes ; then
+  def_drm='#define CONFIG_DRM 1'
+  vomodules="drm $vomodules"
+  libs_mplayer="$libs_mplayer -ldrm"
+  extra_cflags="$extra_cflags -I/usr/include/libdrm"
+else
+  def_drm='#undef CONFIG_DRM'
+  novomodules="drm $novomodules"
+fi
+echores "$_drm"
+
 
 echocheck "DVB"
 if test "$_dvb" = auto ; then
@@ -8745,6 +8767,7 @@ FAAC=$_faac
 FAAD = $_faad
 FASTMEMCPY = $_fastmemcpy
 FBDEV = $_fbdev
+DRM = $_drm
 FREETYPE = $_freetype
 FTP = $_ftp
 GIF = $_gif
@@ -9387,6 +9410,7 @@ $def_dvbin
 $def_dxr2
 $def_dxr3
 $def_fbdev
+$def_drm
 $def_ggi
 $def_ggiwmh
 $def_gif
