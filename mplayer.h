@@ -38,6 +38,7 @@ extern float heartbeat_interval;
 extern float  audio_delay;
 extern double start_pts;
 extern int progbar_align;
+extern double loop_start_sec;
 
 /* for the GUI */
 extern int auto_quality;

@@ -205,6 +205,9 @@ static double seek_to_sec = MP_NOPTS_VALUE;
 static off_t seek_to_byte;
 static off_t step_sec;
 static int loop_seek;
+double loop_start_sec = 0.0;
+static int first_playthrough = 1;
+static char *last_played_filename = NULL;
 
 static m_time_size_t end_at = { .type = END_AT_NONE, .pos = 0 };
 
@@ -2838,6 +2841,10 @@ int main(int argc, char *argv[])
     filename = mpctx->playtree_iter ? play_tree_iter_get_file(mpctx->playtree_iter, 1) : NULL;
 
     print_version("MPlayer");
+
+    // Debug: Show loop_start_sec value after parsing command line
+    mp_msg(MSGT_CPLAYER, MSGL_INFO, "[DEBUG] loop_start_sec = %.2f\n", loop_start_sec);
+
 #if (defined(__MINGW32__) || defined(__CYGWIN__)) && defined(CONFIG_GUI)
     void *runningmplayer = FindWindow("MPlayer GUI for Windows", "MPlayer for Windows");
     if (runningmplayer && filename && use_gui) {
@@ -3718,6 +3725,23 @@ goto_enable_cache:
         else if (mpctx->loop_times == 1)
             mpctx->loop_times = -1;
 
+        // Reset first playthrough flag only for new files, not when looping same file
+        if (!last_played_filename || !filename || strcmp(last_played_filename, filename) != 0) {
+            first_playthrough = 1;
+            if (last_played_filename) {
+                free(last_played_filename);
+            }
+            last_played_filename = filename ? strdup(filename) : NULL;
+            mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] New file detected, first_playthrough = 1\n");
+        } else {
+            mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] Same file, first_playthrough = %d\n", first_playthrough);
+            // Mark that we've completed at least one playthrough
+            if (first_playthrough) {
+                first_playthrough = 0;
+                mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] First playthrough complete\n");
+            }
+        }
+
         mp_msg(MSGT_CPLAYER, MSGL_INFO, MSGTR_StartPlaying);
 
         total_time_usage_start = GetTimer();
@@ -3737,6 +3761,12 @@ goto_enable_cache:
         if (seek_to_sec != MP_NOPTS_VALUE) {
             seek(mpctx, seek_to_sec, SEEK_ABSOLUTE);
             end_at.pos += seek_to_sec;
+        }
+
+        // Apply loop-start seek on subsequent playthroughs
+        if (!first_playthrough && loop_start_sec > 0.0) {
+            mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] Seeking to loop start position: %.2f seconds\n", loop_start_sec);
+            seek(mpctx, loop_start_sec, SEEK_ABSOLUTE);
         }
 
 #ifdef CONFIG_DVDNAV
@@ -4006,6 +4036,11 @@ goto_enable_cache:
             if (mpctx->eof == 1 && mpctx->loop_times >= 0) {
                 mp_msg(MSGT_CPLAYER, MSGL_V, "loop_times = %d, eof = %d\n", mpctx->loop_times, mpctx->eof);
 
+                if (loop_start_sec > 0.0) {
+                    mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] loop_start_sec = %.2f, first_playthrough = %d\n",
+                           loop_start_sec, first_playthrough);
+                }
+
                 if (mpctx->loop_times > 1)
                     mpctx->loop_times--;
                 else if (mpctx->loop_times == 1)
@@ -4013,11 +4048,31 @@ goto_enable_cache:
                 play_n_frames = play_n_frames_mf;
                 mpctx->eof    = 0;
                 abs_seek_pos  = SEEK_ABSOLUTE;
-                rel_seek_secs = seek_to_sec;
-                if (seek_to_sec == MP_NOPTS_VALUE) {
-                    // the first pts is not necessarily 0
-                    abs_seek_pos  = SEEK_ABSOLUTE | SEEK_FACTOR;
-                    rel_seek_secs = 0;
+
+                // Handle loop-start: first playthrough plays from beginning,
+                // subsequent loops start from loop_start_sec
+                if (first_playthrough && loop_start_sec > 0.0) {
+                    // First time reaching end, next loop will start from loop_start_sec
+                    first_playthrough = 0;
+                    rel_seek_secs = seek_to_sec;
+                    if (seek_to_sec == MP_NOPTS_VALUE) {
+                        // the first pts is not necessarily 0
+                        abs_seek_pos  = SEEK_ABSOLUTE | SEEK_FACTOR;
+                        rel_seek_secs = 0;
+                    }
+                    mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] First playthrough complete, looping from beginning\n");
+                } else if (loop_start_sec > 0.0) {
+                    // Subsequent loops: seek to loop_start_sec
+                    rel_seek_secs = loop_start_sec;
+                    mp_msg(MSGT_CPLAYER, MSGL_INFO, "[loop] Seeking to loop start position: %.2f seconds\n", loop_start_sec);
+                } else {
+                    // No loop_start_sec specified, use default behavior
+                    rel_seek_secs = seek_to_sec;
+                    if (seek_to_sec == MP_NOPTS_VALUE) {
+                        // the first pts is not necessarily 0
+                        abs_seek_pos  = SEEK_ABSOLUTE | SEEK_FACTOR;
+                        rel_seek_secs = 0;
+                    }
                 }
                 loop_seek     = 1;
             }

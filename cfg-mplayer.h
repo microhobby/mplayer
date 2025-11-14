@@ -315,6 +315,7 @@ const m_option_t mplayer_opts[]={
 
     {"noloop", &mpctx_s.loop_times, CONF_TYPE_FLAG, 0, 0, -1, NULL},
     {"loop", &mpctx_s.loop_times, CONF_TYPE_INT, CONF_RANGE, -1, 10000, NULL},
+    {"loop-start", &loop_start_sec, CONF_TYPE_DOUBLE, CONF_RANGE, 0, 10000, NULL},
     {"allow-dangerous-playlist-parsing", &allow_playlist_parsing, CONF_TYPE_FLAG, 0, 0, 1, NULL},
     {"noallow-dangerous-playlist-parsing", &allow_playlist_parsing, CONF_TYPE_FLAG, 0, 1, 0, NULL},
     {"playlist", NULL, CONF_TYPE_STRING, CONF_NOCFG, 0, 0, NULL},
