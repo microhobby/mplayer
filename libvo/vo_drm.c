@@ -354,8 +354,11 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     image_height = height;
     image_format = format;
 
-    if (drm_setup_display() < 0) {
-        return 1;
+    // Only initialize DRM display on first config call (fixed-vo support)
+    if (vo_config_count == 0) {
+        if (drm_setup_display() < 0) {
+            return 1;
+        }
     }
 
     // Calculate centering offsets (like fbdev2)
@@ -376,6 +379,12 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     // Convert MPlayer format to FFmpeg format
     src_format = imgfmt2pixfmt(format);
 
+    // Clean up old conversion context if it exists
+    if (sws_ctx) {
+        sws_freeContext(sws_ctx);
+        sws_ctx = NULL;
+    }
+
     // Initialize conversion context (no scaling, just format conversion)
     sws_ctx = sws_getContext(width, height, src_format,
                             width, height, AV_PIX_FMT_BGRA,
@@ -383,6 +392,12 @@ static int config(uint32_t width, uint32_t height, uint32_t d_width,
     if (!sws_ctx) {
         mp_msg(MSGT_VO, MSGL_ERR, "[drm] Cannot initialize conversion context\n");
         return 1;
+    }
+
+    // Free old conversion buffer if it exists
+    if (convert_buffer) {
+        free(convert_buffer);
+        convert_buffer = NULL;
     }
 
     // Allocate conversion buffer (same size as input, different format)
